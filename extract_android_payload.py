@@ -48,14 +48,17 @@ class PayloadError(Exception):
 
 class PayloadHeader:
     def __init__(self, buffer):
-        fmt = '>I2QI'
+        self._fmt = '>I2QI'
         (
             self.magic,
             self.version,
             self.manifest_size,
             self.metadata_signature_size
-        ) = unpack(fmt, buffer[0:calcsize(fmt)])
-        self.size = calcsize(fmt)
+        ) = unpack(self._fmt, buffer[0:self.header_size])
+
+    @property
+    def header_size(self):
+        return calcsize(self._fmt)
 
 
 @dataclass
@@ -102,9 +105,6 @@ class PayloadBinUnpack:
             raise PayloadError(f'Unsupported header version. Version on header: {header.version} '
                                f'Support version: {MAJOR_PAYLOAD_VERSION}')
 
-        assert MAGIC_NUMBER == header.magic, 'Invalid magic value in header {}'
-        assert MAJOR_PAYLOAD_VERSION == header.version, 'Unsupported header version '
-
         payload = Payload(header=header, fd=fd)
         payload.manifest.ParseFromString(fd.read(header.manifest_size))
 
@@ -113,7 +113,7 @@ class PayloadBinUnpack:
         if metadata_signature_message:
             payload.metadata_signature.ParseFromString(metadata_signature_message)
 
-        payload.metadata_size = header.size + header.manifest_size
+        payload.metadata_size = header.header_size + header.manifest_size
         payload.data_offset = payload.metadata_size + header.metadata_signature_size
 
         return payload
